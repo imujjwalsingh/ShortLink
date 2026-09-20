@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: shortlink-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: shortlink-redis
+    ports:
+      - "6379:6379"
+
+  url-service:
+    build:
+      context: .
+      dockerfile: url-service/Dockerfile
+    container_name: shortlink-url-service
+    ports:
+      - "8081:8081"
+    environment:
+      MONGODB_URI: mongodb://mongodb:27017/shortlink
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PUBLIC_BASE_URL: http://localhost:8081
+    depends_on:
+      - mongodb
+      - redis
+
+  # Future services (Kafka, Elasticsearch, analytics-service,
+  # notification-service, api-gateway, auth-service...) get added here as
+  # sibling entries, each pointing at its own module's Dockerfile.
+
+volumes:
+  mongo-data:

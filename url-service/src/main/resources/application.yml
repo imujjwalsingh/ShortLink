@@ -1,0 +1,33 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: url-service
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/shortlink}
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+
+app:
+  # Base used to build the shortUrl field in API responses. Point this at
+  # wherever the redirect is actually reachable (through the gateway, once
+  # that exists).
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:8081}
+  cache:
+    # How long a redirect cache entry lives before self-expiring, as a
+    # backstop on top of explicit eviction on deactivate().
+    ttl-seconds: ${CACHE_TTL_SECONDS:3600}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.shortlink.urlservice: INFO
