@@ -1,18 +1,20 @@
 package com.shortlink.urlservice.service;
 
 /**
- * Encodes a positive long into a base62 string ([0-9a-zA-Z]).
+ * Encodes a non-negative long into a base62 string ([0-9A-Za-z]).
  *
  * Why base62-over-a-counter instead of hashing the URL (e.g. MD5 + truncate):
- *  - Guaranteed no collisions (the counter is unique by construction), so no
- *    retry/collision-check loop is needed on the write path.
+ *  - The counter never repeats, so two generated codes can never collide.
+ *    (A generated code CAN land on a custom alias someone already claimed;
+ *    UrlService handles that by skipping to the next counter value.)
  *  - Short codes stay compact and predictable in length as the counter grows
  *    (7 base62 chars covers ~3.5 trillion IDs).
  *  - Trade-off: codes are sequential/guessable-ish (aB3xY, aB3xZ, ...), which
- *    leaks approximate creation order and volume. A hash-based approach
- *    avoids that but needs collision handling and doesn't shorten as
- *    predictably. For a portfolio project the counter approach is the
- *    cleaner story and the one worth defending in an interview.
+ *    leaks approximate creation order and volume, and lets anyone walk the
+ *    redirect space. Management endpoints are owner-only, so walking codes
+ *    only reveals destinations that are public by nature of being short
+ *    links. A keyed permutation of the counter (e.g. a small Feistel network)
+ *    would hide the order without giving up collision-freedom.
  */
 public final class Base62Encoder {
 
@@ -24,6 +26,9 @@ public final class Base62Encoder {
     }
 
     public static String encode(long value) {
+        if (value < 0) {
+            throw new IllegalArgumentException("Cannot base62-encode a negative value: " + value);
+        }
         if (value == 0) {
             return String.valueOf(ALPHABET.charAt(0));
         }

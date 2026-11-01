@@ -1,0 +1,66 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: analytics-service
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    connection-timeout: 2s
+    socket-timeout: 10s
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: analytics-service
+      auto-offset-reset: earliest
+      properties:
+        max.poll.records: 100
+    producer:
+      acks: all
+      properties:
+        max.block.ms: 3000
+    listener:
+      # One consumer thread per link-clicks partition.
+      concurrency: 3
+    admin:
+      operation-timeout: 5s
+      close-timeout: 5s
+      fail-fast: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:}
+    issuer: ${JWT_ISSUER:shortlink-auth}
+  kafka:
+    clicks-topic: link-clicks
+    milestones-topic: link-milestones
+    partitions: 3
+    replicas: 1
+    # Transient failures (Elasticsearch unreachable, timeouts) are retried
+    # with exponential backoff for up to this long before the record goes
+    # to link-clicks.DLT for later replay. Must stay well under the
+    # consumer's max.poll.interval.ms (5 min).
+    retry-max-elapsed: 2m
+  elasticsearch:
+    clicks-index: link-clicks
+    counters-index: link-click-counters
+  # Click totals that trigger a LinkMilestone event (and an email from
+  # notification-service). 1 = "your link got its first click".
+  milestones: 1,10,100,1000,10000,100000,1000000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,elasticsearch
+
+logging:
+  level:
+    org.apache.kafka.clients.NetworkClient: ERROR
