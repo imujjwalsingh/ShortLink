@@ -1,5 +1,11 @@
 server:
   port: 8081
+  # Honour the Forwarded / X-Forwarded-* headers the gateway adds, so URLs
+  # this service builds (the Location header on POST /api/urls) use the
+  # public host instead of the internal "url-service:8081". Safe only
+  # because the service is reachable solely through the gateway, which
+  # strips client-supplied forwarding headers first.
+  forward-headers-strategy: framework
 
 spring:
   application:
@@ -7,27 +13,97 @@ spring:
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/shortlink}
+      # Spring Data MongoDB 3+ does NOT create @Indexed indexes unless this
+      # is on. Without it the unique index on shortCode never exists: every
+      # lookup is a collection scan and nothing stops duplicate codes.
+      auto-index-creation: true
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      timeout: 2000ms
+      # Kept short on purpose: Redis is an optimization on the redirect hot
+      # path, so a slow Redis must cost milliseconds, not seconds, before
+      # UrlCacheService gives up and falls back to Mongo.
+      timeout: ${REDIS_TIMEOUT:250ms}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:250ms}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        # How long send() may block waiting for topic metadata or buffer
+        # space. Sends already run off the request thread (see
+        # ClickEventPublisher), this just stops publisher threads piling up
+        # behind a dead broker.
+        max.block.ms: 2000
+        linger.ms: 5
+        delivery.timeout.ms: 30000
+        request.timeout.ms: 10000
+    admin:
+      # Don't stall startup for 30s+ when Kafka is down; topic creation is
+      # retried by KafkaAdmin on the next attempt and the broker would
+      # auto-create in dev anyway.
+      operation-timeout: 5s
+      close-timeout: 5s
+      fail-fast: false
 
 app:
   # Base used to build the shortUrl field in API responses. Point this at
-  # wherever the redirect is actually reachable (through the gateway, once
-  # that exists).
-  public-base-url: ${PUBLIC_BASE_URL:http://localhost:8081}
+  # wherever the redirect is actually reachable: the api-gateway in the
+  # docker-compose setup.
+  public-base-url: ${PUBLIC_BASE_URL:http://localhost:8080}
+  jwt:
+    # Shared HMAC secret used by auth-service to sign tokens. No default on
+    # purpose: a secret committed to the repo would let anyone forge
+    # tokens. docker-compose supplies a dev value; locally, export
+    # JWT_SECRET (at least 32 bytes) before `mvn spring-boot:run`.
+    secret: ${JWT_SECRET:}
+    issuer: ${JWT_ISSUER:shortlink-auth}
   cache:
-    # How long a redirect cache entry lives before self-expiring, as a
-    # backstop on top of explicit eviction on deactivate().
+    # How long a positive redirect cache entry lives before self-expiring,
+    # as a backstop on top of version-checked write-through on every
+    # mutation.
     ttl-seconds: ${CACHE_TTL_SECONDS:3600}
+    # Short TTL for "this code does not exist" entries so junk lookups
+    # don't hit Mongo every time, while a later create (which writes
+    # through) is never shadowed for long even if that write-through fails.
+    negative-ttl-seconds: ${CACHE_NEGATIVE_TTL_SECONDS:60}
+    circuit-breaker:
+      failure-threshold: 5
+      open-duration: 30s
+  analytics:
+    # Publish a LinkClicked event to Kafka for every successful redirect.
+    # Set false to run url-service without Kafka at all.
+    enabled: ${ANALYTICS_ENABLED:true}
+    topic: link-clicks
+    publisher-queue-capacity: 10000
+    # HMAC key for the visitor hash (client IP + user agent). Set it in
+    # every environment; without it each process picks a random key and
+    # unique-visitor ids change on restart.
+    visitor-hash-key: ${VISITOR_HASH_KEY:}
+  # Aliases that can never be claimed because they collide with paths the
+  # gateway or Spring itself already owns (checked case-insensitively).
+  reserved-aliases: api,actuator,error,health,login,logout,register,admin,static,assets,favicon,robots
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        # Load balancers / orchestrators must use /actuator/health/readiness.
+        # It deliberately excludes Redis: the cache fails open, so a Redis
+        # outage must never take this service out of rotation. The
+        # aggregate /actuator/health still reports Redis for visibility.
+        readiness:
+          include: readinessState,mongo
 
 logging:
   level:
     com.shortlink.urlservice: INFO
+    # The Kafka client logs every failed reconnect at WARN; that is noise
+    # when the broker is briefly unavailable.
+    org.apache.kafka.clients.NetworkClient: ERROR

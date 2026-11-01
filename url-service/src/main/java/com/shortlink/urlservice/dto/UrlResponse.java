@@ -9,6 +9,7 @@ public record UrlResponse(
         String shortUrl,
         String originalUrl,
         Instant createdAt,
+        Instant updatedAt,
         Instant expiresAt,
         boolean active
 ) {
@@ -18,6 +19,7 @@ public record UrlResponse(
                 baseUrl + "/" + mapping.getShortCode(),
                 mapping.getOriginalUrl(),
                 mapping.getCreatedAt(),
+                mapping.getUpdatedAt(),
                 mapping.getExpiresAt(),
                 mapping.isActive()
         );

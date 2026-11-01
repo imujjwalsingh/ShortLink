@@ -1,0 +1,57 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: auth-service
+  data:
+    mongodb:
+      # Its own database: services never read each other's data directly.
+      uri: ${MONGODB_URI:mongodb://localhost:27017/shortlink_auth}
+      auto-index-creation: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        max.block.ms: 3000
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+    admin:
+      operation-timeout: 5s
+      close-timeout: 5s
+      fail-fast: false
+
+app:
+  jwt:
+    # HS256 signing secret shared with the services that validate tokens.
+    # No default on purpose (see url-service application.yml).
+    secret: ${JWT_SECRET:}
+    issuer: ${JWT_ISSUER:shortlink-auth}
+    access-token-ttl: ${JWT_TTL:1h}
+  kafka:
+    user-registered-topic: user-registered
+    partitions: 3
+    replicas: 1
+  outbox:
+    # How often the relay looks for users whose UserRegistered event has not
+    # been acknowledged by Kafka yet.
+    poll-interval-ms: 2000
+    batch-size: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,mongo
+
+logging:
+  level:
+    org.apache.kafka.clients.NetworkClient: ERROR

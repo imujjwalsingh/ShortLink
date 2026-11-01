@@ -1,0 +1,108 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 250ms
+      connect-timeout: 250ms
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 2000
+        # A downstream that accepts the connection but never answers gets a
+        # 504 after this, instead of tying up the gateway indefinitely.
+        response-timeout: 10s
+      x-forwarded:
+        for-append: true
+      default-filters:
+        # Drop every forwarding header the client sent; the gateway then
+        # adds its own (real peer address, public host/proto/port) when
+        # proxying. Otherwise a client could spoof the IP that url-service
+        # feeds into the visitor hash, or the host it builds URLs from.
+        - RemoveRequestHeader=X-Forwarded-For
+        - RemoveRequestHeader=X-Forwarded-Host
+        - RemoveRequestHeader=X-Forwarded-Proto
+        - RemoveRequestHeader=X-Forwarded-Port
+        - RemoveRequestHeader=X-Forwarded-Prefix
+        - RemoveRequestHeader=Forwarded
+      globalcors:
+        cors-configurations:
+          '[/api/**]':
+            allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+            allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+            allowed-headers: Authorization,Content-Type
+            exposed-headers: Location,X-RateLimit-Remaining
+            max-age: 3600
+      # Rate limits are token buckets per (route, client IP), stored in
+      # Redis: replenishRate tokens/second, up to burstCapacity at once.
+      # Over the limit: 429. If Redis is unreachable the limiter fails OPEN
+      # (requests are allowed), consistent with the cache: Redis being down
+      # must not take the product down.
+      routes:
+        - id: auth
+          uri: ${AUTH_SERVICE_URI:http://localhost:8083}
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            # Strict: login/register are the brute-force and spam targets.
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 2
+                redis-rate-limiter.burstCapacity: 10
+                key-resolver: "#{@clientIpKeyResolver}"
+
+        - id: urls
+          uri: ${URL_SERVICE_URI:http://localhost:8081}
+          predicates:
+            - Path=/api/urls,/api/urls/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 30
+                key-resolver: "#{@clientIpKeyResolver}"
+
+        - id: analytics
+          uri: ${ANALYTICS_SERVICE_URI:http://localhost:8082}
+          predicates:
+            - Path=/api/analytics/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 5
+                redis-rate-limiter.burstCapacity: 20
+                key-resolver: "#{@clientIpKeyResolver}"
+
+        # Redirects: any single path segment made of short-code characters.
+        # Declared last so the /api routes above win; /actuator/** is served
+        # by the gateway's own actuator before routing happens at all.
+        - id: redirect
+          uri: ${URL_SERVICE_URI:http://localhost:8081}
+          predicates:
+            - Method=GET
+            - Path=/{code:[A-Za-z0-9_-]+}
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 50
+                redis-rate-limiter.burstCapacity: 100
+                key-resolver: "#{@clientIpKeyResolver}"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,gateway
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          # Not Redis: the rate limiter fails open without it.
+          include: readinessState

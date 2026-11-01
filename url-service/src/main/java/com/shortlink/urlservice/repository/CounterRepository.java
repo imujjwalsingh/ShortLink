@@ -24,6 +24,10 @@ public class CounterRepository {
      * Atomically increments and returns the next value of the shared
      * sequence. findAndModify with upsert=true means the first call ever
      * made creates the counter document, no manual seeding required.
+     *
+     * With upsert + returnNew a null result should be impossible. If it
+     * ever happens, failing loudly is the only safe option: falling back to
+     * a fixed value would hand the same short code to several links.
      */
     public long getNextSequence() {
         Query query = Query.query(where("_id").is(SEQUENCE_NAME));
@@ -33,6 +37,9 @@ public class CounterRepository {
                 .upsert(true);
 
         Counter counter = mongoTemplate.findAndModify(query, update, options, Counter.class);
-        return counter != null ? counter.getSeq() : 1L;
+        if (counter == null) {
+            throw new IllegalStateException("Counter findAndModify returned null for sequence " + SEQUENCE_NAME);
+        }
+        return counter.getSeq();
     }
 }
