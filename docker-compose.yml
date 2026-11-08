@@ -1,4 +1,5 @@
-# Full ShortLink stack: infrastructure + all five services.
+# Full ShortLink backend: infrastructure + all five services (built from
+# ./backend). The web app in ./frontend runs separately (npm run dev).
 #
 #   docker compose up --build
 #
@@ -29,7 +30,7 @@ x-service-defaults: &service-defaults
   # the whole Docker VM.
   mem_limit: 512m
   build: &service-build
-    context: .
+    context: ./backend
     dockerfile: Dockerfile
 
 services:
@@ -124,7 +125,7 @@ services:
       MONGODB_URI: mongodb://mongodb:27017/shortlink
       REDIS_HOST: redis
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      PUBLIC_BASE_URL: http://localhost:8080
+      PUBLIC_BASE_URL: http://localhost:${GATEWAY_HOST_PORT:-8080}
       VISITOR_HASH_KEY: ${VISITOR_HASH_KEY:-dev-only-visitor-hash-key-change-me}
     depends_on:
       mongodb: { condition: service_healthy }
@@ -181,7 +182,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       MAIL_HOST: mailpit
       MAIL_PORT: 1025
-      PUBLIC_BASE_URL: http://localhost:8080
+      PUBLIC_BASE_URL: http://localhost:${GATEWAY_HOST_PORT:-8080}
     depends_on:
       mongodb: { condition: service_healthy }
       kafka: { condition: service_healthy }

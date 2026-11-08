@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
 #
 # One Dockerfile for every service; docker-compose passes the module name as
-# the SERVICE build arg. The build context is the repo root because Maven's
-# reactor needs the parent pom.xml AND every module's pom.xml listed in it,
-# even when building just one module with -pl.
+# the SERVICE build arg. The build context is this backend/ folder because
+# Maven's reactor needs the parent pom.xml AND every module's pom.xml listed
+# in it, even when building just one module with -pl.
 
 # ---- Build stage ----
 FROM maven:3.9-eclipse-temurin-21 AS build

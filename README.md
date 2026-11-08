@@ -9,6 +9,34 @@ interview talking points for that service.
 requirements, capacity, trade-offs) · [Low-Level Design](docs/LLD.md)
 (classes, schemas, APIs, algorithms, flow and sequence diagrams).
 
+**Web app:** a React frontend in [`frontend/`](frontend/README.md)
+(dashboard, link management, per-link analytics charts). Like any other
+client, it goes through the gateway.
+
+## Repository layout
+
+```
+ShortLink/
+├── backend/              Spring Boot microservices (Maven multi-module)
+│   ├── pom.xml           parent POM: versions, plugins, module list
+│   ├── Dockerfile        one image recipe for every service
+│   ├── api-gateway/
+│   ├── auth-service/
+│   ├── url-service/
+│   ├── analytics-service/
+│   └── notification-service/
+├── frontend/             React + TypeScript web app (Vite, npm)
+├── docs/                 HLD and LLD
+├── scripts/              smoke-test.sh: end-to-end checks against the running stack
+├── docker-compose.yml    infrastructure + the backend services
+└── .env.example          overrides for docker-compose (secrets, host ports)
+```
+
+The two halves build independently: Maven in `backend/`, npm in
+`frontend/`. The files that run or test the whole system stay at the root.
+
+## Architecture
+
 ```
                          ┌──────────────────────────── api-gateway :8080 ───────────────────────────┐
   client ───HTTP────────▶│ routing · per-IP rate limits (Redis, fail-open) · CORS · XFF sanitising  │
@@ -31,11 +59,12 @@ requirements, capacity, trade-offs) · [Low-Level Design](docs/LLD.md)
 
 | Service | Port | Owns | Does |
 |---|---|---|---|
-| [api-gateway](api-gateway/README.md) | 8080 | — | Single entry point: routes, rate-limits per client IP, CORS |
-| [url-service](url-service/README.md) | 8081 | `shortlink` DB | Short-code generation, link CRUD, the redirect, Redis cache, click events |
-| [analytics-service](analytics-service/README.md) | 8082 | `link-clicks` index | Consumes clicks into Elasticsearch, serves per-link stats, emits milestones |
-| [auth-service](auth-service/README.md) | 8083 | `shortlink_auth` DB | Registration, login, JWT issuance, `UserRegistered` events |
-| [notification-service](notification-service/README.md) | 8084 | `shortlink_notifications` DB | Welcome and click-milestone emails |
+| [api-gateway](backend/api-gateway/README.md) | 8080 | — | Single entry point: routes, rate-limits per client IP, CORS |
+| [url-service](backend/url-service/README.md) | 8081 | `shortlink` DB | Short-code generation, link CRUD, the redirect, Redis cache, click events |
+| [analytics-service](backend/analytics-service/README.md) | 8082 | `link-clicks` index | Consumes clicks into Elasticsearch, serves per-link stats, emits milestones |
+| [auth-service](backend/auth-service/README.md) | 8083 | `shortlink_auth` DB | Registration, login, JWT issuance, `UserRegistered` events |
+| [notification-service](backend/notification-service/README.md) | 8084 | `shortlink_notifications` DB | Welcome and click-milestone emails |
+| [frontend](frontend/README.md) | 3000 | — | React web app (Vite dev server); calls only the gateway |
 
 Each service owns its data; nobody reads another service's database. They
 communicate only over HTTP (via the gateway) and Kafka, and there are no
@@ -49,7 +78,11 @@ docker compose up --build -d          # first build takes a few minutes
 MAILPIT=http://localhost:8025 ./scripts/smoke-test.sh   # ...plus email delivery
 ```
 
-Then open http://localhost:8025 to see the emails. Secrets fall back to
+For the web app, with the stack up:
+`cd frontend && npm install && npm run dev`, then open
+http://localhost:3000 (needs Node.js 22.22+).
+
+Open http://localhost:8025 to see the emails. Secrets fall back to
 dev-only values; copy `.env.example` to `.env` to set real ones. If a port
 is already taken on your machine (typically 27017 by a local MongoDB),
 move it with the matching variable, e.g.
@@ -57,13 +90,19 @@ move it with the matching variable, e.g.
 listed in `.env.example`. `docker compose down` stops everything (add `-v`
 to also delete the data volumes).
 
-Running one service from your IDE: start the infra with
+Running one service from your IDE: open `backend/` (its `pom.xml`) as the
+Maven project, start the infra with
 `docker compose up -d mongodb redis kafka elasticsearch mailpit`, export
 `JWT_SECRET` (any string of 32+ bytes, the same for every service), and run
 the module's `*Application` class. Defaults point at `localhost`.
 
-Building and testing: `mvn clean install` from the root builds every module
-and runs the unit/slice tests (no Docker needed for the tests).
+Building and testing, from the repo root (or `cd` into the folder and drop
+the `-f` / `--prefix`):
+
+```bash
+mvn -f backend/pom.xml clean install   # every service + 153 unit/slice tests, no Docker needed
+npm --prefix frontend test             # frontend unit/component tests
+```
 
 ## API walkthrough
 
