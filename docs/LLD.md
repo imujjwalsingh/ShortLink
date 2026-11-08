@@ -23,45 +23,49 @@ Contents
 
 ## 1. Codebase layout
 
-A Maven multi-module build: one parent POM pins Java 21, Spring Boot 3.3.4
-and Spring Cloud 2023.0.3. There are no Maven dependencies between modules.
+The backend is a Maven multi-module build in `backend/`: one parent POM
+pins Java 21, Spring Boot 3.3.4 and Spring Cloud 2023.0.3. There are no
+Maven dependencies between modules. The web app in `frontend/` is a
+separate npm project (see its README).
 
 ```
 ShortLink/
-├── pom.xml                       parent: versions, plugin config, module list
-├── Dockerfile                    one multi-stage image recipe, ARG SERVICE
-├── docker-compose.yml            infra + 5 services
+├── docker-compose.yml            infra + 5 services (build context: backend/)
 ├── scripts/smoke-test.sh         end-to-end checks through the gateway
-├── url-service/        com.shortlink.urlservice
-│   ├── config/         SecurityConfig, RedisConfig, KafkaConfig
-│   ├── controller/     UrlController
-│   ├── dto/            CreateUrlRequest, UpdateUrlRequest, UrlResponse, PageResponse
-│   ├── event/          LinkClickedEvent, ClickEventPublisher, KafkaClickEventPublisher, VisitorHasher
-│   ├── exception/      GlobalExceptionHandler + domain exceptions
-│   ├── model/          UrlMapping, Counter
-│   ├── repository/     UrlMappingRepository, CounterRepository
-│   ├── service/        UrlService, UrlCacheService, CachedUrlMapping, SimpleCircuitBreaker, Base62Encoder
-│   └── validation/     @HttpUrl, HttpUrlValidator
-├── auth-service/       com.shortlink.authservice
-│   ├── config/         SecurityConfig, JwtProperties, KafkaConfig
-│   ├── controller/     AuthController
-│   ├── event/          UserRegisteredEvent, UserOutboxRelay
-│   ├── model/ repository/ service/ (AuthService, TokenService) dto/ exception/
-├── analytics-service/  com.shortlink.analyticsservice
-│   ├── config/         SecurityConfig, KafkaConfig, ElasticsearchConfig
-│   ├── event/          ClickEventListener, MilestonePublisher, event records
-│   ├── ingest/         ClickIngestionService, ClickEnricher
-│   ├── repository/     ClickRepository (writes + schema)
-│   ├── service/        AnalyticsService (queries)
-│   └── controller/ dto/ model/ exception/
-├── notification-service/ com.shortlink.notificationservice
-│   ├── config/         KafkaConfig
-│   ├── event/          NotificationListeners, event records
-│   ├── service/        NotificationService, EmailSender
-│   └── model/ repository/
-└── api-gateway/        com.shortlink.gateway
-    ├── config/         RateLimitConfig (KeyResolver)
-    └── resources/      application.yml (routes, filters, limits)
+├── frontend/                     React + TypeScript web app (Vite)
+└── backend/
+    ├── pom.xml                   parent: versions, plugin config, module list
+    ├── Dockerfile                one multi-stage image recipe, ARG SERVICE
+    ├── url-service/        com.shortlink.urlservice
+    │   ├── config/         SecurityConfig, RedisConfig, KafkaConfig
+    │   ├── controller/     UrlController
+    │   ├── dto/            CreateUrlRequest, UpdateUrlRequest, UrlResponse, PageResponse
+    │   ├── event/          LinkClickedEvent, ClickEventPublisher, KafkaClickEventPublisher, VisitorHasher
+    │   ├── exception/      GlobalExceptionHandler + domain exceptions
+    │   ├── model/          UrlMapping, Counter
+    │   ├── repository/     UrlMappingRepository, CounterRepository
+    │   ├── service/        UrlService, UrlCacheService, CachedUrlMapping, SimpleCircuitBreaker, Base62Encoder
+    │   └── validation/     @HttpUrl, HttpUrlValidator
+    ├── auth-service/       com.shortlink.authservice
+    │   ├── config/         SecurityConfig, JwtProperties, KafkaConfig
+    │   ├── controller/     AuthController
+    │   ├── event/          UserRegisteredEvent, UserOutboxRelay
+    │   └── model/ repository/ service/ (AuthService, TokenService) dto/ exception/
+    ├── analytics-service/  com.shortlink.analyticsservice
+    │   ├── config/         SecurityConfig, KafkaConfig, ElasticsearchConfig
+    │   ├── event/          ClickEventListener, MilestonePublisher, event records
+    │   ├── ingest/         ClickIngestionService, ClickEnricher
+    │   ├── repository/     ClickRepository (writes + schema)
+    │   ├── service/        AnalyticsService (queries)
+    │   └── controller/ dto/ model/ exception/
+    ├── notification-service/ com.shortlink.notificationservice
+    │   ├── config/         KafkaConfig
+    │   ├── event/          NotificationListeners, event records
+    │   ├── service/        NotificationService, EmailSender
+    │   └── model/ repository/
+    └── api-gateway/        com.shortlink.gateway
+        ├── config/         RateLimitConfig (KeyResolver)
+        └── resources/      application.yml (routes, filters, limits)
 ```
 
 ---
@@ -1231,4 +1235,4 @@ nothing beyond its own state.
 | Component (gateway booted, stub upstream, no Redis) | Routing, junk-path rejection, forwarding-header rewriting, rate-limiter fail-open, readiness | `GatewayRoutingTest` |
 | End-to-end (running stack) | 35 checks across auth, links, redirects, ownership, edits, analytics, deactivation; optional email checks via Mailpit | `scripts/smoke-test.sh` |
 
-`mvn clean install` runs 153 tests with no Docker required.
+`mvn clean install` in `backend/` runs 153 tests with no Docker required.

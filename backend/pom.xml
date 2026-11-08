@@ -31,8 +31,8 @@
     </properties>
 
     <!--
-        Every service is a module here so `mvn clean install` from the root
-        builds them all. There are deliberately NO Maven dependencies
+        Every service is a module here so `mvn clean install` from this
+        backend/ folder builds them all. There are deliberately NO Maven dependencies
         between the services: they only talk to each other over HTTP
         (through the gateway) and Kafka at runtime, and each one keeps its
         own copy of the event records it produces or consumes (tolerant

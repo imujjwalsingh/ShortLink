@@ -25,7 +25,7 @@ Validation: `originalUrl` must parse as an absolute http(s) URL with a host
 ```bash
 docker compose up -d mongodb redis kafka        # from the repo root
 export JWT_SECRET=any-string-of-at-least-32-bytes-shared-with-auth
-mvn spring-boot:run
+mvn spring-boot:run                             # from backend/url-service
 ```
 Set `ANALYTICS_ENABLED=false` to run without Kafka.
 
