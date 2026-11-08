@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Components use semantic utilities (bg-surface, text-ink-2,
+ * border-line, ...) instead of raw colors, so dark mode is a second set of
+ * values here rather than dark: variants sprinkled through every component.
+ *
+ * Values follow the dataviz reference palette: warm neutral grays, one blue
+ * accent, and status colors (good / serious / critical) reserved for state.
+ * Light and dark are each chosen for their own surface, not a mechanical flip.
+ */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --wash: #f0efec;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781; /* axis ticks and placeholders only: 3.6:1 on light */
+  --line: rgba(11, 11, 11, 0.1);
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --accent: #256abf; /* white text on it: 5.4:1 */
+  --accent-hover: #1c5cab;
+  --accent-soft: #cde2fb;
+  --accent-text: #256abf; /* links on the surface: 5.2:1 */
+  --danger-solid: #b42f2f; /* white text on it: 6.4:1, same in both themes */
+  --danger-solid-hover: #9c2828;
+  --series-1: #2a78d6;
+  --good: #0ca30c;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --danger-text: #b42f2f;
+  --danger-wash: #fbeaea;
+  --success-text: #006300;
+  --success-wash: #e7f4e7;
+}
+
+/* Dark values under both scopes: the media query follows the OS setting,
+   the data-theme attribute is the in-app toggle and wins either way. */
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --wash: #262624;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --line: rgba(255, 255, 255, 0.1);
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --accent: #2a78d6;
+    --accent-hover: #3987e5;
+    --accent-soft: rgba(57, 135, 229, 0.22);
+    --accent-text: #6da7ec;
+    --series-1: #3987e5;
+    --danger-text: #e66767;
+    --danger-wash: rgba(208, 59, 59, 0.16);
+    --success-text: #0ca30c;
+    --success-wash: rgba(12, 163, 12, 0.14);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface: #1a1a19;
+  --wash: #262624;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --line: rgba(255, 255, 255, 0.1);
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --accent: #2a78d6;
+  --accent-hover: #3987e5;
+  --accent-soft: rgba(57, 135, 229, 0.22);
+  --accent-text: #6da7ec;
+  --series-1: #3987e5;
+  --danger-text: #e66767;
+  --danger-wash: rgba(208, 59, 59, 0.16);
+  --success-text: #0ca30c;
+  --success-wash: rgba(12, 163, 12, 0.14);
+}
+
+@theme inline {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-wash: var(--wash);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-solid-hover: var(--danger-solid-hover);
+  --color-series-1: var(--series-1);
+  --color-good: var(--good);
+  --color-serious: var(--serious);
+  --color-critical: var(--critical);
+  --color-danger: var(--danger-text);
+  --color-danger-wash: var(--danger-wash);
+  --color-success: var(--success-text);
+  --color-success-wash: var(--success-wash);
+}
+
+@layer base {
+  body {
+    @apply bg-page text-ink antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  dialog::backdrop {
+    background: rgb(0 0 0 / 0.45);
+  }
+}
