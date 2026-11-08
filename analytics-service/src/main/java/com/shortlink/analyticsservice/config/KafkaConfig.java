@@ -5,6 +5,7 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
@@ -70,6 +71,11 @@ public class KafkaConfig {
         backOff.setMaxElapsedTime(maxElapsed.toMillis());
         DefaultErrorHandler handler = new DefaultErrorHandler(new DeadLetterPublishingRecoverer(kafkaTemplate), backOff);
         handler.addNotRetryableExceptions(InvalidEventException.class);
+        // Each retry is signalled with a "Seek to current after exception"
+        // KafkaException, logged at ERROR with a full stack trace by default:
+        // an Elasticsearch outage would flood the log with "errors" that are
+        // really expected, transient retries. WARN is the honest level.
+        handler.setLogLevel(KafkaException.Level.WARN);
         return handler;
     }
 }

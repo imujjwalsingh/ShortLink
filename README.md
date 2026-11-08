@@ -50,7 +50,12 @@ MAILPIT=http://localhost:8025 ./scripts/smoke-test.sh   # ...plus email delivery
 ```
 
 Then open http://localhost:8025 to see the emails. Secrets fall back to
-dev-only values; copy `.env.example` to `.env` to set real ones.
+dev-only values; copy `.env.example` to `.env` to set real ones. If a port
+is already taken on your machine (typically 27017 by a local MongoDB),
+move it with the matching variable, e.g.
+`MONGO_HOST_PORT=27018 docker compose up --build -d`; all of them are
+listed in `.env.example`. `docker compose down` stops everything (add `-v`
+to also delete the data volumes).
 
 Running one service from your IDE: start the infra with
 `docker compose up -d mongodb redis kafka elasticsearch mailpit`, export
