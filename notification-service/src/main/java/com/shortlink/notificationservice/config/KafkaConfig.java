@@ -5,6 +5,7 @@ import org.apache.kafka.clients.admin.NewTopic;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.KafkaException;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
@@ -62,6 +63,9 @@ public class KafkaConfig {
         backOff.setMaxElapsedTime(maxElapsed.toMillis());
         DefaultErrorHandler handler = new DefaultErrorHandler(new DeadLetterPublishingRecoverer(kafkaTemplate), backOff);
         handler.addNotRetryableExceptions(InvalidEventException.class);
+        // Retries are expected and transient (SMTP down, contact not known
+        // yet); Spring Kafka would otherwise log every one at ERROR.
+        handler.setLogLevel(KafkaException.Level.WARN);
         return handler;
     }
 }

@@ -17,11 +17,13 @@ COPY auth-service/pom.xml auth-service/pom.xml
 COPY analytics-service/pom.xml analytics-service/pom.xml
 COPY notification-service/pom.xml notification-service/pom.xml
 COPY api-gateway/pom.xml api-gateway/pom.xml
-RUN --mount=type=cache,target=/root/.m2 \
+# sharing=locked: compose builds all five images in parallel, and Maven's
+# local repository isn't safe for concurrent writers.
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
     mvn -B -q -pl ${SERVICE} -am dependency:go-offline
 
 COPY ${SERVICE}/src ${SERVICE}/src
-RUN --mount=type=cache,target=/root/.m2 \
+RUN --mount=type=cache,target=/root/.m2,sharing=locked \
     mvn -B -q -pl ${SERVICE} -am package -DskipTests \
  && cp ${SERVICE}/target/${SERVICE}-*.jar /app/app.jar
 

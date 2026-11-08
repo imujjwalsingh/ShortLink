@@ -1070,7 +1070,7 @@ flowchart LR
     MATCH{"route predicate<br/>matches?"}
     R404(["404"])
     STRIP["default filters:<br/>remove client X-Forwarded-*<br/>and Forwarded headers"]
-    KEY["clientIpKeyResolver<br/>key = TCP peer address"]
+    KEY["clientIpKeyResolver<br/>key = routeId : TCP peer address"]
     RL{"Redis token bucket<br/>route + key"}
     R429(["429 Too Many Requests"])
     PROXY["Netty routing filter<br/>adds X-Forwarded-For, -Host, -Proto, -Port<br/>and Forwarded with real values"]
@@ -1103,7 +1103,15 @@ Routes are matched in declaration order.
 
 Other settings: CORS on `/api/**` for `CORS_ALLOWED_ORIGINS`; HTTP client
 timeouts of 2 s (connect) and 10 s (response). Readiness includes only
-`readinessState`, not Redis.
+`readinessState`, not Redis. Lettuce uses `REJECT_COMMANDS` while
+disconnected (as in url-service), so a Redis outage costs nothing per request.
+
+**Rate-limit key = `{routeId}:{peer IP}`.** `RedisRateLimiter` stores the
+bucket as `request_rate_limiter.{key}.tokens` and `...timestamp`, using the
+resolved key only, while it takes rate and burst from the route being
+called. With an IP-only key all routes share one bucket and the auth route's
+burst of 10 throttles everything else. That was observed in docker-compose
+(12 logins, then 10 redirects returned 429) and is fixed by the route prefix.
 
 **Why forwarding headers are stripped and rewritten.** url-service builds
 its `Location` header from `Forwarded` / `X-Forwarded-Host`
@@ -1223,4 +1231,4 @@ nothing beyond its own state.
 | Component (gateway booted, stub upstream, no Redis) | Routing, junk-path rejection, forwarding-header rewriting, rate-limiter fail-open, readiness | `GatewayRoutingTest` |
 | End-to-end (running stack) | 35 checks across auth, links, redirects, ownership, edits, analytics, deactivation; optional email checks via Mailpit | `scripts/smoke-test.sh` |
 
-`mvn clean install` runs 149 tests with no Docker required.
+`mvn clean install` runs 153 tests with no Docker required.

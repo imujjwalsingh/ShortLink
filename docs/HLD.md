@@ -515,7 +515,7 @@ flowchart TB
 | D7 | Event-carried state (contact table) in notification-service | Synchronous call to auth-service for the email | No runtime coupling to auth-service's availability. |
 | D8 | HS256 JWT validated by each service | Validate at the gateway only; RS256 + JWKS | No implicit trust of the gateway. HS256 is simpler for one team; RS256 is the upgrade path. |
 | D9 | JSON strings on Kafka, tolerant readers | Avro/Protobuf with a schema registry; Spring type headers | Simple and language-neutral, with no class-name coupling. A schema registry is worth adding as the number of event types grows. |
-| D10 | Gateway rate limits keyed on the TCP peer address | `X-Forwarded-For`; JWT subject | Both alternatives can be forged by the client. |
+| D10 | Gateway rate limits keyed on route id + TCP peer address | `X-Forwarded-For`; JWT subject; IP alone | XFF and JWT subject can be forged by the client. IP alone makes all routes share one bucket (Redis stores it under the key only), so the strict login limit would throttle redirects. |
 
 ---
 
